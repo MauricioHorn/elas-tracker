@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ELAS — Acompanhamento ao Vivo</title>
+  <meta name="description" content="Acompanhe em tempo real a localização de quem você protege.">
+  <meta name="theme-color" content="#0A0A14">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      background: #0A0A14;
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+    
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #0A0A14;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.3s;
+    }
+    
+    .logo-elas {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 24px;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    .loading-text {
+      color: #B4B4C7;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+    
+    #header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, rgba(10,10,20,0.95) 0%, rgba(10,10,20,0.85) 100%);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      padding: 16px 20px;
+      z-index: 100;
+      border-bottom: 1px solid rgba(255,77,126,0.2);
+    }
+    
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+    }
+    
+    .brand-name {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #FF4D7E 0%, #A78BFA 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #10B981;
+      font-weight: 500;
+    }
+    
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #10B981;
+      border-radius: 50%;
+      animation: blink 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    .tracking-info {
+      font-size: 13px;
+      color: #E5E5E5;
+      font-weight: 500;
+    }
+    
+    .tracking-info strong {
+      color: #fff;
+    }
+    
+    .demo-badge {
+      display: inline-block;
+      background: rgba(255,193,7,0.2);
+      color: #FFC107;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+      margin-left: 8px;
+      letter-spacing: 0.5px;
+    }
+    
+    #map {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      width: 100%;
+      height: 100%;
+    }
+    
+    #info-card {
+      position: fixed;
+      bottom: 16px;
+      left: 16px;
+      right: 16px;
+      background: rgba(10,10,20,0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 20px;
+      z-index: 100;
+      border: 1px solid rgba(255,77,126,0.3);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+    
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+    
+    .info-item {
+      flex: 1;
+      background: rgba(255,77,126,0.08);
+      padding: 12px;
+      border-radius: 12px;
+      text-align: center;
+    }
+    
+    .info-label {
+      font-size: 10px;
+      color: #B4B4C7;
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    
+    .info-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+    
+    .battery-good { color: #10B981; }
+    .battery-medium { color: #F59E0B; }
+    .battery-low { color: #EF4444; }
+    
+    .last-update {
+      text-align: center;
+      font-size: 12px;
+      color: #B4B4C7;
+      padding-top: 4px;
+    }
+    
+    .last-update strong {
+      color: #FF4D7E;
+    }
+    
+    #error {
+      position: fixed;
+      inset: 0;
+      background: #0A0A14;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      text-align: center;
+      z-index: 9998;
+    }
+    
+    #error.active {
+      display: flex;
+    }
+    
+    .error-emoji {
+      font-size: 64px;
+      margin-bottom: 16px;
+    }
+    
+    .error-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+    
+    .error-message {
+      font-size: 14px;
+      color: #B4B4C7;
+      line-height: 1.5;
+      max-width: 300px;
+    }
+    
+    #map-fallback {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at center, #1a1a2e 0%, #0A0A14 100%);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    
+    #map-fallback.active {
+      display: flex;
+    }
+    
+    .fallback-content {
+      text-align: center;
+      padding: 40px;
+    }
+    
+    .fallback-pin {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, #FF4D7E, #A78BFA);
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      position: relative;
+      animation: bounce 2s ease-in-out infinite;
+    }
+    
+    .fallback-pin::after {
+      content: '';
+      width: 24px;
+      height: 24px;
+      background: #0A0A14;
+      border-radius: 50%;
+      position: absolute;
+      top: 20px;
+      left: 20px;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: rotate(-45deg) translateY(0); }
+      50% { transform: rotate(-45deg) translateY(-10px); }
+    }
+    
+    .fallback-coords {
+      color: #FF4D7E;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+    
+    .fallback-note {
+      color: #B4B4C7;
+      font-size: 12px;
+    }
+    
+    @media (max-width: 380px) {
+      #info-card {
+        padding: 16px;
+      }
+      
+      .info-value {
+        font-size: 16px;
+      }
+    }
+    
+    .gm-style-cc,
+    .gmnoprint,
+    .gm-fullscreen-control {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="loading">
+    <svg class="logo-elas" viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#FF4D7E"/>
+          <stop offset="100%" style="stop-color:#A78BFA"/>
+        </linearGradient>
+      </defs>
+      <path d="M50 82 L18 50 C10 42, 10 28, 20 20 C28 14, 40 16, 46 24 L50 30 L54 24 C60 16, 72 14, 80 20 C90 28, 90 42, 82 50 Z" 
+            fill="url(#grad1)"/>
+    </svg>
+    <div class="loading-text">Conectando...</div>
+  </div>
+  
+  <div id="header" style="display:none;">
+    <div class="header-top">
+      <div class="brand">
+        <svg class="brand-logo" viewBox="0 0 100 100" fill="none">
+          <defs>
+            <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#FF4D7E"/>
+              <stop offset="100%" style="stop-color:#A78BFA"/>
+            </linearGradient>
+          </defs>
+          <path d="M50 82 L18 50 C10 42, 10 28, 20 20 C28 14, 40 16, 46 24 L50 30 L54 24 C60 16, 72 14, 80 20 C90 28, 90 42, 82 50 Z" 
+                fill="url(#grad2)"/>
+        </svg>
+        <span class="brand-name">ELAS</span>
+      </div>
+      <div class="live-indicator">
+        <span class="live-dot"></span>
+        AO VIVO
+      </div>
+    </div>
+    <div class="tracking-info">
+      Acompanhando <strong id="user-name">...</strong><span id="demo-badge" class="demo-badge" style="display:none;">TESTE</span>
+    </div>
+  </div>
+  
+  <div id="map"></div>
+  
+  <div id="map-fallback">
+    <div class="fallback-content">
+      <div class="fallback-pin"></div>
+      <div class="fallback-coords" id="fallback-coords">--</div>
+      <div class="fallback-note">Localização em tempo real</div>
+    </div>
+  </div>
+  
+  <div id="info-card" style="display:none;">
+    <div class="info-row">
+      <div class="info-item">
+        <div class="info-label">Bateria</div>
+        <div class="info-value" id="battery">--</div>
+      </div>
+      <div class="info-item">
+        <div class="info-label">Em trânsito há</div>
+        <div class="info-value" id="duration">--</div>
+      </div>
+    </div>
+    <div class="last-update">
+      Última atualização: <strong id="last-update">agora</strong>
+    </div>
+  </div>
+  
+  <div id="error">
+    <div class="error-emoji">😕</div>
+    <div class="error-title">Sessão não encontrada</div>
+    <div class="error-message">
+      Este link pode ter expirado ou a sessão de Modo Seguro já foi encerrada.
+      Entre em contato com a pessoa que te enviou.
+    </div>
+  </div>
+  
+  <script>
+    // ========================================
+    // CONFIGURAÇÃO
+    // ========================================
+    const SUPABASE_URL = 'https://dokzmnqkxdphfayvlxka.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRva3ptbnFreGRwaGZheXZseGthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NzI5OTYsImV4cCI6MjA5MjI0ODk5Nn0.VmzGQLuJdDDyGd_cq0D5nU23U4V6DnATImZvvThKzfs';
+    const GOOGLE_MAPS_API_KEY = '';
+    
+    // ========================================
+    // CÓDIGO PRINCIPAL
+    // ========================================
+    
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    // Detecta se está rodando local (file:// ou localhost)
+    const isLocal = window.location.protocol === 'file:' || 
+                    window.location.hostname === 'localhost' ||
+                    window.location.hostname === '127.0.0.1';
+    
+    // Pega token APENAS se vier via query param (?token=XXX)
+    // Isso evita confusão com o path do arquivo local
+    const urlParams = new URLSearchParams(window.location.search);
+    let token = urlParams.get('token');
+    
+    // Se não é local E não tem ?token=, tenta pegar do path (produção)
+    if (!isLocal && !token) {
+      const pathToken = window.location.pathname.replace(/^\//, '').replace(/\/$/, '');
+      // Só usa path token se parece com um token de verdade (sem extensão de arquivo, > 20 chars)
+      if (pathToken.length > 20 && !pathToken.includes('.')) {
+        token = pathToken;
+      }
+    }
+    
+    let map = null;
+    let marker = null;
+    let sessionData = null;
+    let sessionStart = null;
+    let lastUpdateTime = null;
+    let usingFallback = false;
+    
+    function loadGoogleMaps() {
+      return new Promise((resolve, reject) => {
+        if (!GOOGLE_MAPS_API_KEY) {
+          reject(new Error('No Google Maps API key'));
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&loading=async&callback=initMap`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = reject;
+        window.initMap = resolve;
+        document.head.appendChild(script);
+      });
+    }
+    
+    const mapStyles = [
+      { elementType: "geometry", stylers: [{ color: "#1a1a2e" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#1a1a2e" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#A78BFA" }] },
+      { featureType: "road", elementType: "geometry", stylers: [{ color: "#2d2d44" }] },
+      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#B4B4C7" }] },
+      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f0f1e" }] },
+      { featureType: "poi", stylers: [{ visibility: "off" }] },
+      { featureType: "transit", stylers: [{ visibility: "off" }] }
+    ];
+    
+    function initMapWithLocation(lat, lng) {
+      if (usingFallback) {
+        document.getElementById('fallback-coords').textContent = 
+          `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        return;
+      }
+      
+      const position = { lat, lng };
+      
+      map = new google.maps.Map(document.getElementById('map'), {
+        center: position,
+        zoom: 16,
+        styles: mapStyles,
+        disableDefaultUI: true,
+        gestureHandling: 'greedy',
+        clickableIcons: false
+      });
+      
+      marker = new google.maps.Marker({
+        position: position,
+        map: map,
+        title: 'Localização atual',
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#FF4D7E',
+          fillOpacity: 1,
+          strokeColor: '#fff',
+          strokeWeight: 3,
+          scale: 12
+        }
+      });
+      
+      const pulseCircle = new google.maps.Circle({
+        strokeColor: '#FF4D7E',
+        strokeOpacity: 0.4,
+        strokeWeight: 2,
+        fillColor: '#FF4D7E',
+        fillOpacity: 0.1,
+        map: map,
+        center: position,
+        radius: 50
+      });
+      
+      let radius = 50;
+      let growing = true;
+      setInterval(() => {
+        if (growing) {
+          radius += 2;
+          if (radius >= 100) growing = false;
+        } else {
+          radius -= 2;
+          if (radius <= 50) growing = true;
+        }
+        pulseCircle.setRadius(radius);
+      }, 50);
+    }
+    
+    function updateMarkerPosition(lat, lng) {
+      if (usingFallback) {
+        document.getElementById('fallback-coords').textContent = 
+          `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+        return;
+      }
+      
+      const position = { lat, lng };
+      if (marker) marker.setPosition(position);
+      if (map) map.panTo(position);
+    }
+    
+    function updateBattery(level) {
+      const batteryEl = document.getElementById('battery');
+      batteryEl.textContent = `${Math.round(level)}%`;
+      
+      batteryEl.classList.remove('battery-good', 'battery-medium', 'battery-low');
+      if (level > 50) batteryEl.classList.add('battery-good');
+      else if (level > 20) batteryEl.classList.add('battery-medium');
+      else batteryEl.classList.add('battery-low');
+    }
+    
+    function updateDuration() {
+      if (!sessionStart) return;
+      
+      const now = new Date();
+      const diff = now - new Date(sessionStart);
+      const minutes = Math.floor(diff / 60000);
+      
+      const durationEl = document.getElementById('duration');
+      if (minutes < 1) {
+        durationEl.textContent = 'agora';
+      } else if (minutes < 60) {
+        durationEl.textContent = `${minutes}min`;
+      } else {
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        durationEl.textContent = `${hours}h${mins}min`;
+      }
+    }
+    
+    function updateLastUpdate() {
+      if (!lastUpdateTime) return;
+      
+      const now = new Date();
+      const diff = now - lastUpdateTime;
+      const seconds = Math.floor(diff / 1000);
+      
+      const updateEl = document.getElementById('last-update');
+      if (seconds < 10) updateEl.textContent = 'agora';
+      else if (seconds < 60) updateEl.textContent = `há ${seconds}s`;
+      else {
+        const minutes = Math.floor(seconds / 60);
+        updateEl.textContent = `há ${minutes}min`;
+      }
+    }
+    
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      const errorEl = document.getElementById('error');
+      if (message) {
+        errorEl.querySelector('.error-message').textContent = message;
+      }
+      errorEl.classList.add('active');
+    }
+    
+    function showMainUI(isDemo) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('header').style.display = 'block';
+      document.getElementById('info-card').style.display = 'block';
+      
+      if (isDemo) {
+        document.getElementById('demo-badge').style.display = 'inline-block';
+      }
+      
+      if (usingFallback) {
+        document.getElementById('map-fallback').classList.add('active');
+      }
+    }
+    
+    async function startDemoMode() {
+      document.getElementById('user-name').textContent = 'Maria';
+      sessionStart = new Date();
+      lastUpdateTime = new Date();
+      
+      try {
+        await loadGoogleMaps();
+      } catch (err) {
+        usingFallback = true;
+      }
+      
+      initMapWithLocation(-23.5505, -46.6333);
+      updateBattery(85);
+      showMainUI(true);
+      
+      setInterval(() => {
+        updateDuration();
+        updateLastUpdate();
+      }, 10000);
+      updateDuration();
+      updateLastUpdate();
+    }
+    
+    async function init() {
+      // SEM TOKEN = Modo Demo
+      if (!token) {
+        await startDemoMode();
+        return;
+      }
+      
+      // COM TOKEN = Tenta buscar sessão real
+      try {
+        const mapsPromise = loadGoogleMaps().catch(() => {
+          usingFallback = true;
+        });
+        
+        const { data: session, error } = await sb
+          .from('safety_sessions')
+          .select('*')
+          .eq('share_token', token)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Erro Supabase:', error);
+          showError('Erro ao buscar sessão. Tente novamente.');
+          return;
+        }
+        
+        if (!session) {
+          showError('Esta sessão não está mais ativa ou o link expirou.');
+          return;
+        }
+        
+        sessionData = session;
+        sessionStart = session.started_at;
+        
+        document.getElementById('user-name').textContent = session.user_name || 'Amiga';
+        
+        if (session.battery_level) updateBattery(session.battery_level);
+        lastUpdateTime = new Date(session.last_update || session.started_at);
+        
+        await mapsPromise;
+        
+        if (session.current_lat && session.current_lng) {
+          initMapWithLocation(session.current_lat, session.current_lng);
+        } else {
+          initMapWithLocation(-23.5505, -46.6333);
+        }
+        
+        showMainUI(false);
+        
+        const channel = sb
+          .channel(`session:${session.id}`)
+          .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'safety_sessions',
+            filter: `id=eq.${session.id}`
+          }, (payload) => {
+            const updated = payload.new;
+            
+            if (updated.current_lat && updated.current_lng) {
+              updateMarkerPosition(updated.current_lat, updated.current_lng);
+            }
+            
+            if (updated.battery_level) {
+              updateBattery(updated.battery_level);
+            }
+            
+            lastUpdateTime = new Date(updated.last_update || new Date());
+            
+            if (!updated.is_active) {
+              setTimeout(() => {
+                showError('Sessão encerrada. A pessoa chegou ao destino em segurança!');
+              }, 2000);
+            }
+          })
+          .subscribe();
+        
+        setInterval(() => {
+          updateDuration();
+          updateLastUpdate();
+        }, 10000);
+        
+        updateDuration();
+        updateLastUpdate();
+        
+      } catch (err) {
+        console.error('Erro:', err);
+        showError('Não foi possível conectar. Tente novamente.');
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+</body>
+</html>
